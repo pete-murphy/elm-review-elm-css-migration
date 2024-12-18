@@ -14,7 +14,7 @@ import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNam
 import Review.Rule as Rule exposing (Error, Rule)
 
 
-{-| Reports... REPLACEME
+{-| Reports instances of `Html.Styled.Attributes.css` that are not inside a list of attributes.
 
     config =
         [ OnlyInAttributeList.rule
@@ -24,19 +24,23 @@ import Review.Rule as Rule exposing (Error, Rule)
 ## Fail
 
     a =
-        "REPLACEME example to replace"
+        Html.div [ style ]
+            []
+
+    style =
+        Attr.css []
 
 
 ## Success
 
     a =
-        "REPLACEME example to replace"
+        Html.div [ Attr.css [] ]
+            []
 
 
 ## When (not) to enable this rule
 
-This rule is useful when REPLACEME.
-This rule is not useful when REPLACEME.
+This rule is useful when migrating off of `elm-css`.
 
 
 ## Try it out

@@ -1,22 +1,22 @@
 # elm-review-elm-css-migration
 
-Provides [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rules to REPLACEME.
+Provides [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rules to assist in migrating off of `elm-css`.
 
 ## Provided rules
 
-- [`ElmCssMigration`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.0/ElmCssMigration) - Reports REPLACEME.
+- [`OnlyInAttributeList`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.0/OnlyInAttributeList) - Reports instances of `css` outside of list of attributes.
 
 ## Configuration
 
 ```elm
 module ReviewConfig exposing (config)
 
-import ElmCssMigration
+importOnlyInAttributeList
 import Review.Rule exposing (Rule)
 
 config : List Rule
 config =
-    [ ElmCssMigration.rule
+    [ OnlyInAttributeList.rule
     ]
 ```
 
