@@ -54,7 +54,7 @@ elm-review --template pete-murphy/elm-review-elm-css-migration/example --rules O
 -}
 rule : Rule
 rule =
-    Rule.newProjectRuleSchema "Css.Migration.OnlyInAttributeList" []
+    Rule.newProjectRuleSchema "OnlyInAttributeList" []
         |> Rule.withModuleVisitor moduleVisitor
         |> Rule.withModuleContextUsingContextCreator
             { fromProjectToModule = fromProjectToModule
