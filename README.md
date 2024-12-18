@@ -4,7 +4,7 @@ Provides [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-revi
 
 ## Provided rules
 
-- [`OnlyInAttributeList`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.0/OnlyInAttributeList) - Reports instances of `css` outside of list of attributes.
+- [`OnlyInAttributeList`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.1/OnlyInAttributeList/) - Reports instances of `css` outside of list of attributes.
 
 ## Configuration
 

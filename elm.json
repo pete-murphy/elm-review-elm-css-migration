@@ -1,17 +1,19 @@
 {
-  "type": "package",
-  "name": "pete-murphy/elm-review-elm-css-migration",
-  "summary": "`elm-review` rules for migrating off of `elm-css`",
-  "license": "MIT",
-  "version": "1.0.0",
-  "exposed-modules": ["OnlyInAttributeList"],
-  "elm-version": "0.19.0 <= v < 0.20.0",
-  "dependencies": {
-    "elm/core": "1.0.5 <= v < 2.0.0",
-    "jfmengels/elm-review": "2.14.0 <= v < 3.0.0",
-    "stil4m/elm-syntax": "7.2.9 <= v < 8.0.0"
-  },
-  "test-dependencies": {
-    "elm-explorations/test": "2.0.1 <= v < 3.0.0"
-  }
+    "type": "package",
+    "name": "pete-murphy/elm-review-elm-css-migration",
+    "summary": "`elm-review` rules for migrating off of `elm-css`",
+    "license": "MIT",
+    "version": "1.0.1",
+    "exposed-modules": [
+        "OnlyInAttributeList"
+    ],
+    "elm-version": "0.19.0 <= v < 0.20.0",
+    "dependencies": {
+        "elm/core": "1.0.5 <= v < 2.0.0",
+        "jfmengels/elm-review": "2.14.0 <= v < 3.0.0",
+        "stil4m/elm-syntax": "7.2.9 <= v < 8.0.0"
+    },
+    "test-dependencies": {
+        "elm-explorations/test": "2.0.1 <= v < 3.0.0"
+    }
 }
