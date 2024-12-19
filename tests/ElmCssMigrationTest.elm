@@ -51,6 +51,23 @@ a = Html.div [ Attr.css [] ]
 """
                     |> Review.Test.run OnlyInAttributeList.rule
                     |> Review.Test.expectNoErrors
+        , test "should not report an error when `css` appears twice in a list of attributes" <|
+            \() ->
+                """module A exposing (..)
+
+import Html.Styled as Html
+import Html.Styled.Attributes as Attr
+
+
+a =
+    Html.div
+        [ Attr.css []
+        , Attr.css []
+        ]
+        []
+"""
+                    |> Review.Test.run OnlyInAttributeList.rule
+                    |> Review.Test.expectNoErrors
         , test "should report an error when `css` appears in a list, but it's not a list of attributes" <|
             \() ->
                 """module A exposing (..)

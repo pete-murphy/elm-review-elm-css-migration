@@ -61,7 +61,6 @@ rule =
             , fromModuleToProject = fromModuleToProject
             , foldProjectContexts = foldProjectContexts
             }
-        -- |> Rule.withDataExtractor dataExtractor
         |> Rule.fromProjectRuleSchema
 
 
@@ -125,35 +124,51 @@ type alias ModuleContext =
     }
 
 
+foundOutsideListError : { message : String, details : List String }
+foundOutsideListError =
+    { message = "Found `css` attribute outside of list"
+    , details =
+        [ "We first need all instances of `Html.Styled.Attributes.css` to be inside a list of attributes so that we can migrate styles to a sibling `class` attribute."
+        ]
+    }
+
+
+toIgnoredNodes : ModuleNameLookupTable -> Node Expression -> List (Node Expression)
+toIgnoredNodes lookupTable node =
+    case node of
+        Node _ (Expression.Application (((Node _ (Expression.FunctionOrValue _ "css")) as cssNode) :: _)) ->
+            case ModuleNameLookupTable.moduleNameFor lookupTable cssNode of
+                Just [ "Html", "Styled", "Attributes" ] ->
+                    [ node, cssNode ]
+
+                _ ->
+                    []
+
+        _ ->
+            []
+
+
 expressionEnterVisitor : Node Expression -> ModuleContext -> ( List (Error {}), ModuleContext )
 expressionEnterVisitor node context =
     if List.member node context.ignoredNodes then
-        case node of
-            Node _ (Expression.Application (((Node _ (Expression.FunctionOrValue _ "css")) as cssNode) :: _)) ->
-                case ModuleNameLookupTable.moduleNameFor context.lookupTable cssNode of
-                    Just [ "Html", "Styled", "Attributes" ] ->
-                        ( [], { context | ignoredNodes = cssNode :: context.ignoredNodes } )
-
-                    _ ->
-                        ( [], context )
-
-            _ ->
-                ( [], context )
+        ( [], context )
 
     else
         case node of
             Node _ (Expression.ListExpr nodes) ->
-                ( [], { context | ignoredNodes = nodes } )
+                ( []
+                , { context
+                    | ignoredNodes =
+                        context.ignoredNodes
+                            ++ List.concatMap (toIgnoredNodes context.lookupTable) nodes
+                  }
+                )
 
             Node range (Expression.FunctionOrValue _ "css") ->
                 case ModuleNameLookupTable.moduleNameFor context.lookupTable node of
                     Just [ "Html", "Styled", "Attributes" ] ->
                         ( [ Rule.errorForModule context.moduleKey
-                                { message = "Found `css` attribute outside of list"
-                                , details =
-                                    [ "We first need all instances of `Html.Styled.Attributes.css` to be inside a list of attributes so that we can migrate styles to a sibling `class` attribute."
-                                    ]
-                                }
+                                foundOutsideListError
                                 range
                           ]
                         , context
@@ -166,11 +181,7 @@ expressionEnterVisitor node context =
                 case ModuleNameLookupTable.moduleNameFor context.lookupTable cssNode of
                     Just [ "Html", "Styled", "Attributes" ] ->
                         ( [ Rule.errorForModule context.moduleKey
-                                { message = "Found `css` attribute outside of list"
-                                , details =
-                                    [ "We first need all instances of `Html.Styled.Attributes.css` to be inside a list of attributes so that we can migrate styles to a sibling `class` attribute."
-                                    ]
-                                }
+                                foundOutsideListError
                                 range
                           ]
                         , { context | ignoredNodes = cssNode :: context.ignoredNodes }
@@ -183,9 +194,3 @@ expressionEnterVisitor node context =
                 ( []
                 , context
                 )
-
-
-
--- expressionExitVisitor : Node Expression -> ModuleContext -> ( List (Error {}), ModuleContext )
--- expressionExitVisitor node context =
---     ( [], context )

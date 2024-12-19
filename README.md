@@ -1,10 +1,10 @@
 # elm-review-elm-css-migration
 
-Provides [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rules to assist in migrating off of `elm-css`.
+Provides [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rules to assist in migrating off of [`elm-css`](https://package.elm-lang.org/packages/rtfeldman/elm-css/latest/).
 
 ## Provided rules
 
-- [`OnlyInAttributeList`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.1/OnlyInAttributeList/) - Reports instances of `css` outside of list of attributes.
+- [`OnlyInAttributeList`](https://package.elm-lang.org/packages/pete-murphy/elm-review-elm-css-migration/1.0.2/OnlyInAttributeList/) - Reports instances of `css` outside of list of attributes.
 
 ## Configuration
 

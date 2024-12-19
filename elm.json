@@ -1,9 +1,9 @@
 {
     "type": "package",
     "name": "pete-murphy/elm-review-elm-css-migration",
-    "summary": "`elm-review` rules for migrating off of `elm-css`",
+    "summary": "`elm-review` rules to help in migrating off of `elm-css`",
     "license": "MIT",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "exposed-modules": [
         "OnlyInAttributeList"
     ],
