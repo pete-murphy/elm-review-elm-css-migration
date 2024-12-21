@@ -1,13 +1,14 @@
 module ElmCssMigrationTest exposing (all)
 
+import Expect
 import OnlyInAttributeList
 import Review.Test
-import Test exposing (Test, describe, test)
+import Test exposing (Test)
 
 
 all : Test
 all =
-    describe "all"
+    Test.describe "all"
         [ onlyInAttributeList
         ]
 
@@ -20,8 +21,8 @@ onlyInAttributeListDetails =
 
 onlyInAttributeList : Test
 onlyInAttributeList =
-    describe "OnlyInAttributeList"
-        [ test "should report an error when `css` appears outside a list of attributes" <|
+    Test.describe "OnlyInAttributeList" <|
+        [ Test.test "should report an error when `css` appears outside a list of attributes" <|
             \() ->
                 """module A exposing (..)
 import Html.Styled as Html
@@ -40,7 +41,7 @@ style = Attr.css []
                             , under = "Attr.css"
                             }
                         ]
-        , test "should not report an error when `css` only appears in a list of attributes" <|
+        , Test.test "should not report an error when `css` only appears in a list of attributes" <|
             \() ->
                 """module A exposing (..)
 import Html.Styled as Html
@@ -51,7 +52,7 @@ a = Html.div [ Attr.css [] ]
 """
                     |> Review.Test.run OnlyInAttributeList.rule
                     |> Review.Test.expectNoErrors
-        , test "should not report an error when `css` appears twice in a list of attributes" <|
+        , Test.test "should not report an error when `css` appears twice in a list of attributes" <|
             \() ->
                 """module A exposing (..)
 
@@ -68,14 +69,14 @@ a =
 """
                     |> Review.Test.run OnlyInAttributeList.rule
                     |> Review.Test.expectNoErrors
-        , test "should report an error when `css` appears in a list, but it's not a list of attributes" <|
+        , Test.test "should report an error when `css` appears in a list, but it's not a list of attributes" <|
             \() ->
                 """module A exposing (..)
 import Html.Styled as Html
 import Html.Styled.Attributes as Attr
 
 a =
-    Html.div [ Attr.css [] ]
+    Html.div []
         [ let
             style =
                 Attr.css []
@@ -89,11 +90,25 @@ a =
                         [ Review.Test.error
                             { message = "Found `css` attribute outside of list"
                             , details = onlyInAttributeListDetails
-                            , under = "Attr.css"
+                            , under = """let
+            style =
+                Attr.css []
+          in
+          Html.div [ style ]
+            [ Html.text "Hello, World!" ]"""
                             }
-                            |> Review.Test.atExactly { start = { row = 9, column = 17 }, end = { row = 9, column = 25 } }
+                            |> Review.Test.whenFixed """module A exposing (..)
+import Html.Styled as Html
+import Html.Styled.Attributes as Attr
+
+a =
+    Html.div []
+        [ Html.div [ Attr.css [] ]
+            [ Html.text "Hello, World!" ]
+        ]
+"""
                         ]
-        , test "should report an error when `css` appears unapplied outside of a list" <|
+        , Test.test "should report an error when `css` appears unapplied outside of a list" <|
             \() ->
                 """module A exposing (..)
 import Html.Styled as Html
@@ -101,11 +116,7 @@ import Html.Styled.Attributes as Attr
 
 a =
     Html.div [ css [] ]
-        [ let
-            style =
-                css []
-          in
-          Html.div [ style ]
+        [ Html.div [ ]
             [ Html.text "Hello, World!" ]
         ]
 

@@ -6,10 +6,11 @@ module OnlyInAttributeList exposing (rule)
 
 -}
 
-import Elm.Syntax.Expression as Expression exposing (Expression)
+import Elm.Syntax.Expression as Expression exposing (Expression, LetDeclaration)
 import Elm.Syntax.ModuleName exposing (ModuleName)
-import Elm.Syntax.Node exposing (Node(..))
+import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range exposing (Range)
+import Review.Fix as Fix exposing (Fix)
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Rule as Rule exposing (Error, Rule)
 
@@ -61,6 +62,7 @@ rule =
             , fromModuleToProject = fromModuleToProject
             , foldProjectContexts = foldProjectContexts
             }
+        |> Rule.providesFixesForProjectRule
         |> Rule.fromProjectRuleSchema
 
 
@@ -70,6 +72,7 @@ moduleVisitor :
 moduleVisitor schema =
     schema
         |> Rule.withExpressionEnterVisitor expressionEnterVisitor
+        |> Rule.withExpressionExitVisitor expressionExitVisitor
 
 
 fromModuleToProject : Rule.ContextCreator ModuleContext ProjectContext
@@ -106,6 +109,7 @@ fromProjectToModule =
             , sourceCodeExtractor = extract
             , acc = projectContext
             , ignoredNodes = []
+            , ignoredRange = Nothing
             }
         )
         |> Rule.withModuleNameLookupTable
@@ -121,6 +125,7 @@ type alias ModuleContext =
     , sourceCodeExtractor : Range -> String
     , acc : List AccItem
     , ignoredNodes : List (Node Expression)
+    , ignoredRange : Maybe Range
     }
 
 
@@ -148,13 +153,122 @@ toIgnoredNodes lookupTable node =
             []
 
 
+getCssDeclaration : ModuleNameLookupTable -> Node LetDeclaration -> Maybe { name : String, rangeToDelete : Range, rangeToKeep : Range }
+getCssDeclaration lookupTable node =
+    case node of
+        Node rangeToDelete (Expression.LetFunction { declaration }) ->
+            case declaration of
+                Node _ { arguments, name, expression } ->
+                    case ( arguments, name, expression ) of
+                        ( [], Node _ name_, Node rangeToKeep (Expression.Application (((Node _ (Expression.FunctionOrValue _ "css")) as cssNode) :: _)) ) ->
+                            case ModuleNameLookupTable.moduleNameFor lookupTable cssNode of
+                                Just [ "Html", "Styled", "Attributes" ] ->
+                                    Just { name = name_, rangeToDelete = rangeToDelete, rangeToKeep = rangeToKeep }
+
+                                _ ->
+                                    Nothing
+
+                        _ ->
+                            Nothing
+
+        _ ->
+            Nothing
+
+
+fixesForExpression : List Fix -> { name : String, replacement : String } -> Node Expression -> List Fix
+fixesForExpression acc r expression =
+    case expression of
+        Node _ (Expression.Application nodes) ->
+            List.concatMap (fixesForExpression acc r) nodes
+
+        Node _ (Expression.ListExpr nodes) ->
+            List.concatMap (fixesForExpression acc r) nodes
+
+        Node rangeToReplace (Expression.FunctionOrValue [] name) ->
+            if name == r.name then
+                Fix.replaceRangeBy rangeToReplace r.replacement :: acc
+
+            else
+                acc
+
+        _ ->
+            acc
+
+
+isWithinIgnoredRange : ModuleContext -> Range -> Bool
+isWithinIgnoredRange context range =
+    case context.ignoredRange of
+        Just ignored ->
+            range.start.row
+                >= ignored.start.row
+                && range.start.column
+                >= ignored.start.column
+                && range.end.row
+                <= ignored.end.row
+                && range.end.column
+                <= ignored.end.column
+
+        Nothing ->
+            False
+
+
 expressionEnterVisitor : Node Expression -> ModuleContext -> ( List (Error {}), ModuleContext )
 expressionEnterVisitor node context =
     if List.member node context.ignoredNodes then
         ( [], context )
 
     else
+        let
+            shouldIgnore range =
+                isWithinIgnoredRange context range
+        in
         case node of
+            Node range (Expression.LetExpression { declarations, expression }) ->
+                let
+                    cssDeclarations =
+                        declarations
+                            |> List.filterMap (getCssDeclaration context.lookupTable)
+
+                    allAreIgnored =
+                        List.length cssDeclarations == List.length declarations
+
+                    fixes =
+                        cssDeclarations
+                            |> List.concatMap
+                                (\d ->
+                                    let
+                                        sourceToKeep =
+                                            context.sourceCodeExtractor d.rangeToKeep
+
+                                        fixesE =
+                                            fixesForExpression [] { name = d.name, replacement = sourceToKeep } expression
+                                    in
+                                    case ( fixesE, allAreIgnored ) of
+                                        ( [], _ ) ->
+                                            []
+
+                                        ( _, True ) ->
+                                            fixesE
+                                                ++ [ Fix.removeRange { start = range.start, end = (Node.range expression).start }
+                                                   ]
+
+                                        _ ->
+                                            fixesE ++ [ Fix.removeRange d.rangeToDelete ]
+                                )
+                in
+                case fixes of
+                    [] ->
+                        ( [], context )
+
+                    _ ->
+                        ( [ Rule.errorForModuleWithFix context.moduleKey
+                                foundOutsideListError
+                                range
+                                fixes
+                          ]
+                        , { context | ignoredRange = Just range }
+                        )
+
             Node _ (Expression.ListExpr nodes) ->
                 ( []
                 , { context
@@ -165,32 +279,49 @@ expressionEnterVisitor node context =
                 )
 
             Node range (Expression.FunctionOrValue _ "css") ->
-                case ModuleNameLookupTable.moduleNameFor context.lookupTable node of
-                    Just [ "Html", "Styled", "Attributes" ] ->
-                        ( [ Rule.errorForModule context.moduleKey
-                                foundOutsideListError
-                                range
-                          ]
-                        , context
-                        )
+                if shouldIgnore range then
+                    ( [], context )
 
-                    _ ->
-                        ( [], context )
+                else
+                    case ModuleNameLookupTable.moduleNameFor context.lookupTable node of
+                        Just [ "Html", "Styled", "Attributes" ] ->
+                            ( [ Rule.errorForModule context.moduleKey
+                                    foundOutsideListError
+                                    range
+                              ]
+                            , context
+                            )
+
+                        _ ->
+                            ( [], context )
 
             Node _ (Expression.Application (((Node range (Expression.FunctionOrValue _ "css")) as cssNode) :: _)) ->
-                case ModuleNameLookupTable.moduleNameFor context.lookupTable cssNode of
-                    Just [ "Html", "Styled", "Attributes" ] ->
-                        ( [ Rule.errorForModule context.moduleKey
-                                foundOutsideListError
-                                range
-                          ]
-                        , { context | ignoredNodes = cssNode :: context.ignoredNodes }
-                        )
+                if shouldIgnore range then
+                    ( [], context )
 
-                    _ ->
-                        ( [], context )
+                else
+                    case ModuleNameLookupTable.moduleNameFor context.lookupTable cssNode of
+                        Just [ "Html", "Styled", "Attributes" ] ->
+                            ( [ Rule.errorForModule context.moduleKey
+                                    foundOutsideListError
+                                    range
+                              ]
+                            , { context | ignoredNodes = cssNode :: context.ignoredNodes }
+                            )
+
+                        _ ->
+                            ( [], context )
 
             _ ->
                 ( []
                 , context
                 )
+
+
+expressionExitVisitor : Node Expression -> ModuleContext -> ( List (Error {}), ModuleContext )
+expressionExitVisitor (Node range _) context =
+    if context.ignoredRange == Just range then
+        ( [], { context | ignoredRange = Nothing } )
+
+    else
+        ( [], context )
