@@ -269,6 +269,16 @@ expressionEnterVisitor node context =
                         , { context | ignoredRange = Just range }
                         )
 
+            -- String InfixDirection (Node Expression) (Node Expression)
+            Node _ (Expression.OperatorApplication "::" _ node_ _) ->
+                ( []
+                , { context
+                    | ignoredNodes =
+                        context.ignoredNodes
+                            ++ toIgnoredNodes context.lookupTable node_
+                  }
+                )
+
             Node _ (Expression.ListExpr nodes) ->
                 ( []
                 , { context

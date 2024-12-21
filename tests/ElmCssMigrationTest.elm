@@ -130,4 +130,21 @@ css = Attr.css
                             , under = "Attr.css"
                             }
                         ]
+        , Test.test "should not report an error when `css` appears as argument to cons (::) operator" <|
+            \() ->
+                """module A exposing (..)
+
+import Html.Styled as Html
+import Html.Styled.Attributes as Attr
+
+
+a =
+    Html.div
+        (Attr.css []
+            :: otherAttrs
+        )
+        []
+"""
+                    |> Review.Test.run OnlyInAttributeList.rule
+                    |> Review.Test.expectNoErrors
         ]
