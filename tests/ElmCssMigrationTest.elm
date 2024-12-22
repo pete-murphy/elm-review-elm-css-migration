@@ -69,6 +69,45 @@ a =
 """
                     |> Review.Test.run OnlyInAttributeList.rule
                     |> Review.Test.expectNoErrors
+        , Test.test "should report an error when `css` appears in a list, but it's not a list of attributes, fix should apply to all instances" <|
+            \() ->
+                """module A exposing (..)
+import Html.Styled as Html
+import Html.Styled.Attributes as Attr
+
+a =
+    Html.div []
+        [ let
+            style =
+                Attr.css []
+          in
+          Html.div [ if True then style else style ]
+            [ Html.text "Hello, World!" ]
+        ]
+"""
+                    |> Review.Test.run OnlyInAttributeList.rule
+                    |> Review.Test.expectErrors
+                        [ Review.Test.error
+                            { message = "Found `css` attribute outside of list"
+                            , details = onlyInAttributeListDetails
+                            , under = """let
+            style =
+                Attr.css []
+          in
+          Html.div [ if True then style else style ]
+            [ Html.text "Hello, World!" ]"""
+                            }
+                            |> Review.Test.whenFixed """module A exposing (..)
+import Html.Styled as Html
+import Html.Styled.Attributes as Attr
+
+a =
+    Html.div []
+        [ Html.div [ if True then Attr.css [] else Attr.css [] ]
+            [ Html.text "Hello, World!" ]
+        ]
+"""
+                        ]
         , Test.test "should report an error when `css` appears in a list, but it's not a list of attributes" <|
             \() ->
                 """module A exposing (..)

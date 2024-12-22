@@ -191,6 +191,41 @@ fixesForExpression acc r expression =
             else
                 acc
 
+        Node _ (Expression.CaseExpression { cases }) ->
+            List.concatMap
+                (\( _, exp ) ->
+                    fixesForExpression acc r exp
+                )
+                cases
+
+        Node _ (Expression.ParenthesizedExpression exp) ->
+            fixesForExpression acc r exp
+
+        Node _ (Expression.RecordExpr setters) ->
+            List.concatMap
+                (\(Node _ ( _, exp )) ->
+                    fixesForExpression acc r exp
+                )
+                setters
+
+        Node _ (Expression.IfBlock _ trueNodes falseNodes) ->
+            fixesForExpression acc r trueNodes ++ fixesForExpression acc r falseNodes
+
+        Node _ (Expression.LetExpression letExp) ->
+            fixesForExpression acc r letExp.expression
+                ++ List.concatMap
+                    (\d ->
+                        case d of
+                            Node _ (Expression.LetFunction f) ->
+                                case f.declaration of
+                                    Node _ dec ->
+                                        fixesForExpression acc r dec.expression
+
+                            Node _ (Expression.LetDestructuring _ exp) ->
+                                fixesForExpression acc r exp
+                    )
+                    letExp.declarations
+
         _ ->
             acc
 
@@ -234,7 +269,7 @@ expressionEnterVisitor node context =
 
                     fixes =
                         cssDeclarations
-                            |> List.concatMap
+                            |> List.map
                                 (\d ->
                                     let
                                         sourceToKeep =
@@ -264,12 +299,11 @@ expressionEnterVisitor node context =
                         ( [ Rule.errorForModuleWithFix context.moduleKey
                                 foundOutsideListError
                                 range
-                                fixes
+                                (List.concat fixes)
                           ]
                         , { context | ignoredRange = Just range }
                         )
 
-            -- String InfixDirection (Node Expression) (Node Expression)
             Node _ (Expression.OperatorApplication "::" _ node_ _) ->
                 ( []
                 , { context
