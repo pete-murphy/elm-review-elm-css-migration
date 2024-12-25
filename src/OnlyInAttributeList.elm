@@ -153,6 +153,14 @@ toIgnoredNodes lookupTable node =
             []
 
 
+{-| Returns `Nothing` if the let declaration is not an application of
+`Html.Styled.Attributes.css`. Otherwise, returns the name of the function being
+defined and the ranges to delete and keep. The `rangeToDelete` is the `let
+<name> =` part and the `rangeToKeep` is the declaration body. We'll use the
+`name` and `rangeToKeep` to replace instances of `name` in the `LetBlock`'s
+expression. If all let declarations are CSS declarations, we can delete the whole
+`LetBlock`
+-}
 getCssDeclaration : ModuleNameLookupTable -> Node LetDeclaration -> Maybe { name : String, rangeToDelete : Range, rangeToKeep : Range }
 getCssDeclaration lookupTable node =
     case node of
@@ -185,11 +193,15 @@ fixesForExpression acc r expression =
             List.concatMap (fixesForExpression acc r) nodes
 
         Node rangeToReplace (Expression.FunctionOrValue [] name) ->
+            -- Only match on unqualified names (because we just want to replace what was declared in the let block)
             if name == r.name then
                 Fix.replaceRangeBy rangeToReplace r.replacement :: acc
 
             else
                 acc
+
+        Node _ (Expression.FunctionOrValue _ _) ->
+            acc
 
         Node _ (Expression.CaseExpression { cases }) ->
             List.concatMap
@@ -226,7 +238,56 @@ fixesForExpression acc r expression =
                     )
                     letExp.declarations
 
-        _ ->
+        Node _ Expression.UnitExpr ->
+            acc
+
+        Node _ (Expression.OperatorApplication _ _ x y) ->
+            fixesForExpression acc r x ++ fixesForExpression acc r y
+
+        Node _ (Expression.PrefixOperator _) ->
+            acc
+
+        Node _ (Expression.Operator _) ->
+            acc
+
+        Node _ (Expression.Integer _) ->
+            acc
+
+        Node _ (Expression.Hex _) ->
+            acc
+
+        Node _ (Expression.Floatable _) ->
+            acc
+
+        Node _ (Expression.Negation x) ->
+            fixesForExpression acc r x
+
+        Node _ (Expression.Literal _) ->
+            acc
+
+        Node _ (Expression.CharLiteral _) ->
+            acc
+
+        Node _ (Expression.TupledExpression xs) ->
+            List.concatMap (fixesForExpression acc r) xs
+
+        Node _ (Expression.LambdaExpression lambda) ->
+            fixesForExpression acc r lambda.expression
+
+        Node _ (Expression.RecordAccess x _) ->
+            fixesForExpression acc r x
+
+        Node _ (Expression.RecordAccessFunction _) ->
+            acc
+
+        Node _ (Expression.RecordUpdateExpression _ setters) ->
+            List.concatMap
+                (\(Node _ ( _, exp )) ->
+                    fixesForExpression acc r exp
+                )
+                setters
+
+        Node _ (Expression.GLSLExpression _) ->
             acc
 
 
@@ -264,12 +325,13 @@ expressionEnterVisitor node context =
                         declarations
                             |> List.filterMap (getCssDeclaration context.lookupTable)
 
+                    -- all declarations are CSS declarations
                     allAreIgnored =
                         List.length cssDeclarations == List.length declarations
 
                     fixes =
                         cssDeclarations
-                            |> List.map
+                            |> List.concatMap
                                 (\d ->
                                     let
                                         sourceToKeep =
@@ -284,11 +346,16 @@ expressionEnterVisitor node context =
 
                                         ( _, True ) ->
                                             fixesE
-                                                ++ [ Fix.removeRange { start = range.start, end = (Node.range expression).start }
-                                                   ]
 
                                         _ ->
                                             fixesE ++ [ Fix.removeRange d.rangeToDelete ]
+                                )
+                            |> List.append
+                                (if allAreIgnored then
+                                    [ Fix.removeRange { start = range.start, end = (Node.range expression).start } ]
+
+                                 else
+                                    []
                                 )
                 in
                 case fixes of
@@ -299,7 +366,7 @@ expressionEnterVisitor node context =
                         ( [ Rule.errorForModuleWithFix context.moduleKey
                                 foundOutsideListError
                                 range
-                                (List.concat fixes)
+                                fixes
                           ]
                         , { context | ignoredRange = Just range }
                         )
